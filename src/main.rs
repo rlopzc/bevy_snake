@@ -117,6 +117,26 @@ fn food_spawner(mut commands: Commands) {
         });
 }
 
+fn snake_movement_input(keyboard_input: Res<Input<KeyCode>>, mut heads: Query<&mut SnakeHead>) {
+    if let Some(mut head) = heads.iter_mut().next() {
+        let dir: Direction = if keyboard_input.pressed(KeyCode::Left) {
+            Direction::Left
+        } else if keyboard_input.pressed(KeyCode::Down) {
+            Direction::Down
+        } else if keyboard_input.pressed(KeyCode::Up) {
+            Direction::Up
+        } else if keyboard_input.pressed(KeyCode::Right) {
+            Direction::Right
+        } else {
+            head.direction
+        };
+
+        if dir != head.direction.opposite() {
+            head.direction = dir;
+        }
+    }
+}
+
 fn snake_movement(mut head_positions: Query<(&mut Position, &SnakeHead)>) {
     if let Some((mut head_position, head)) = head_positions.iter_mut().next() {
         match &head.direction {
@@ -172,6 +192,7 @@ fn main() {
                 .with_run_criteria(FixedTimestep::step(0.100))
                 .with_system(snake_movement),
         )
+        .add_system(snake_movement_input.before(snake_movement))
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(1.0))
