@@ -2,8 +2,15 @@ use bevy::{core::FixedTimestep, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
 use rand::prelude::random;
 
+const ARENA_WIDTH: u32 = 10;
+const ARENA_HEIGHT: u32 = 10;
+const SNAKE_HEAD_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
+const FOOD_COLOR: Color = Color::rgb(1.0, 0.0, 1.0); // <--
+
 #[derive(Component)]
-struct SnakeHead;
+struct SnakeHead {
+    direction: Direction,
+}
 
 #[derive(Component)]
 struct Food;
@@ -28,10 +35,24 @@ impl Size {
     }
 }
 
-const ARENA_WIDTH: u32 = 10;
-const ARENA_HEIGHT: u32 = 10;
-const SNAKE_HEAD_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
-const FOOD_COLOR: Color = Color::rgb(1.0, 0.0, 1.0); // <--
+#[derive(PartialEq, Copy, Clone)]
+enum Direction {
+    Left,
+    Up,
+    Right,
+    Down,
+}
+
+impl Direction {
+    fn opposite(self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+        }
+    }
+}
 
 fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Transform)>) {
     let window = windows.get_primary().unwrap();
@@ -72,7 +93,9 @@ fn spawn_snake(mut commands: Commands) {
             },
             ..default()
         })
-        .insert(SnakeHead)
+        .insert(SnakeHead {
+            direction: Direction::Right,
+        })
         .insert(Size::square(0.8))
         .insert(Position { x: 3, y: 3 });
 }
@@ -94,37 +117,36 @@ fn food_spawner(mut commands: Commands) {
         });
 }
 
-fn snake_movement(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut head_positions: Query<&mut Position, With<SnakeHead>>,
-) {
-    for mut head_position in head_positions.iter_mut() {
-        if keyboard_input.pressed(KeyCode::Left) {
-            if head_position.x - 1 < 0 {
-                head_position.x = (ARENA_WIDTH - 1) as i32;
-            } else {
-                head_position.x -= 1;
+fn snake_movement(mut head_positions: Query<(&mut Position, &SnakeHead)>) {
+    if let Some((mut head_position, head)) = head_positions.iter_mut().next() {
+        match &head.direction {
+            Direction::Left => {
+                if head_position.x - 1 < 0 {
+                    head_position.x = (ARENA_WIDTH - 1) as i32;
+                } else {
+                    head_position.x -= 1;
+                }
             }
-        }
-        if keyboard_input.pressed(KeyCode::Right) {
-            if head_position.x + 1 > (ARENA_WIDTH - 1) as i32 {
-                head_position.x = 0;
-            } else {
-                head_position.x += 1;
+            Direction::Right => {
+                if head_position.x + 1 > (ARENA_WIDTH - 1) as i32 {
+                    head_position.x = 0;
+                } else {
+                    head_position.x += 1;
+                }
             }
-        }
-        if keyboard_input.pressed(KeyCode::Down) {
-            if head_position.y - 1 < 0 {
-                head_position.y = (ARENA_HEIGHT - 1) as i32;
-            } else {
-                head_position.y -= 1;
+            Direction::Down => {
+                if head_position.y - 1 < 0 {
+                    head_position.y = (ARENA_HEIGHT - 1) as i32;
+                } else {
+                    head_position.y -= 1;
+                }
             }
-        }
-        if keyboard_input.pressed(KeyCode::Up) {
-            if head_position.y + 1 > (ARENA_HEIGHT - 1) as i32 {
-                head_position.y = 0;
-            } else {
-                head_position.y += 1;
+            Direction::Up => {
+                if head_position.y + 1 > (ARENA_HEIGHT - 1) as i32 {
+                    head_position.y = 0;
+                } else {
+                    head_position.y += 1;
+                }
             }
         }
     }
