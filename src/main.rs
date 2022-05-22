@@ -137,36 +137,36 @@ fn snake_movement_input(keyboard_input: Res<Input<KeyCode>>, mut heads: Query<&m
     }
 }
 
-fn snake_movement(mut head_positions: Query<(&mut Position, &SnakeHead)>) {
-    if let Some((mut head_position, head)) = head_positions.iter_mut().next() {
-        match &head.direction {
-            Direction::Left => {
-                if head_position.x - 1 < 0 {
-                    head_position.x = (ARENA_WIDTH - 1) as i32;
-                } else {
-                    head_position.x -= 1;
-                }
+fn snake_movement(mut head_position: Query<(&mut Position, &SnakeHead)>) {
+    let (mut head_position, head) = head_position.single_mut();
+
+    match &head.direction {
+        Direction::Left => {
+            if head_position.x - 1 < 0 {
+                head_position.x = (ARENA_WIDTH - 1) as i32;
+            } else {
+                head_position.x -= 1;
             }
-            Direction::Right => {
-                if head_position.x + 1 > (ARENA_WIDTH - 1) as i32 {
-                    head_position.x = 0;
-                } else {
-                    head_position.x += 1;
-                }
+        }
+        Direction::Right => {
+            if head_position.x + 1 > (ARENA_WIDTH - 1) as i32 {
+                head_position.x = 0;
+            } else {
+                head_position.x += 1;
             }
-            Direction::Down => {
-                if head_position.y - 1 < 0 {
-                    head_position.y = (ARENA_HEIGHT - 1) as i32;
-                } else {
-                    head_position.y -= 1;
-                }
+        }
+        Direction::Down => {
+            if head_position.y - 1 < 0 {
+                head_position.y = (ARENA_HEIGHT - 1) as i32;
+            } else {
+                head_position.y -= 1;
             }
-            Direction::Up => {
-                if head_position.y + 1 > (ARENA_HEIGHT - 1) as i32 {
-                    head_position.y = 0;
-                } else {
-                    head_position.y += 1;
-                }
+        }
+        Direction::Up => {
+            if head_position.y + 1 > (ARENA_HEIGHT - 1) as i32 {
+                head_position.y = 0;
+            } else {
+                head_position.y += 1;
             }
         }
     }
