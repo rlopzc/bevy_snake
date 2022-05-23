@@ -5,12 +5,19 @@ use rand::prelude::random;
 const ARENA_WIDTH: u32 = 10;
 const ARENA_HEIGHT: u32 = 10;
 const SNAKE_HEAD_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
-const FOOD_COLOR: Color = Color::rgb(1.0, 0.0, 1.0); // <--
+const SNAKE_SEGMENT_COLOR: Color = Color::rgb(0.3, 0.3, 0.3);
+const FOOD_COLOR: Color = Color::rgb(1.0, 0.0, 1.0);
 
 #[derive(Component)]
 struct SnakeHead {
     direction: Direction,
 }
+
+#[derive(Component)]
+struct SnakeSegment;
+
+#[derive(Default, Deref, DerefMut)]
+struct SnakeSegments(Vec<Entity>);
 
 #[derive(Component)]
 struct Food;
@@ -80,24 +87,25 @@ fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Tra
     }
 }
 
-fn spawn_snake(mut commands: Commands) {
-    commands
-        .spawn_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: SNAKE_HEAD_COLOR,
+fn spawn_snake(mut commands: Commands, mut segments: ResMut<SnakeSegments>) {
+    *segments = SnakeSegments(vec![
+        commands
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: SNAKE_HEAD_COLOR,
+                    ..default()
+                },
                 ..default()
-            },
-            transform: Transform {
-                scale: Vec3::new(10.0, 10.0, 10.0),
-                ..default()
-            },
-            ..default()
-        })
-        .insert(SnakeHead {
-            direction: Direction::Right,
-        })
-        .insert(Size::square(0.8))
-        .insert(Position { x: 3, y: 3 });
+            })
+            .insert(SnakeHead {
+                direction: Direction::Right,
+            })
+            .insert(SnakeSegment)
+            .insert(Size::square(0.8))
+            .insert(Position { x: 3, y: 3 })
+            .id(),
+        spawn_segment(commands, Position { x: 2, y: 3 }),
+    ]);
 }
 
 fn food_spawner(mut commands: Commands) {
@@ -137,8 +145,19 @@ fn snake_movement_input(keyboard_input: Res<Input<KeyCode>>, mut heads: Query<&m
     }
 }
 
-fn snake_movement(mut head_position: Query<(&mut Position, &SnakeHead)>) {
-    let (mut head_position, head) = head_position.single_mut();
+fn snake_movement(
+    segments: ResMut<SnakeSegments>,
+    mut head: Query<(Entity, &SnakeHead)>,
+    mut positions: Query<&mut Position>,
+) {
+    let (head_entity, head) = head.single_mut();
+
+    let segment_positions = segments
+        .iter()
+        .map(|e| *positions.get_mut(*e).unwrap())
+        .collect::<Vec<Position>>();
+
+    let mut head_position = positions.get_mut(head_entity).unwrap();
 
     match &head.direction {
         Direction::Left => {
@@ -170,6 +189,28 @@ fn snake_movement(mut head_position: Query<(&mut Position, &SnakeHead)>) {
             }
         }
     }
+
+    segment_positions
+        .iter()
+        .zip(segments.iter().skip(1))
+        .for_each(|(pos, segment)| {
+            *positions.get_mut(*segment).unwrap() = *pos;
+        });
+}
+
+fn spawn_segment(mut commands: Commands, position: Position) -> Entity {
+    commands
+        .spawn_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: SNAKE_SEGMENT_COLOR,
+                ..default()
+            },
+            ..default()
+        })
+        .insert(SnakeSegment)
+        .insert(position)
+        .insert(Size::square(0.65))
+        .id()
 }
 
 fn setup_camera(mut commands: Commands) {
@@ -204,6 +245,7 @@ fn main() {
                 .with_system(position_translation)
                 .with_system(size_scaling),
         )
+        .insert_resource(SnakeSegments::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
         .register_inspectable::<Size>()
