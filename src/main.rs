@@ -19,10 +19,13 @@ struct SnakeSegment;
 #[derive(Default, Deref, DerefMut)]
 struct SnakeSegments(Vec<Entity>);
 
+#[derive(Default)]
+struct LastTailPosition(Position);
+
 #[derive(Component)]
 struct Food;
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Inspectable)]
+#[derive(Default, Component, Clone, Copy, PartialEq, Eq, Inspectable)]
 struct Position {
     x: i32,
     y: i32,
@@ -60,6 +63,9 @@ impl Direction {
         }
     }
 }
+
+// Events
+struct GrowthEvent;
 
 fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Transform)>) {
     let window = windows.get_primary().unwrap();
@@ -125,6 +131,22 @@ fn food_spawner(mut commands: Commands) {
         });
 }
 
+fn snake_eating(
+    mut commands: Commands,
+    mut growth_writer: EventWriter<GrowthEvent>,
+    food_positions: Query<(Entity, &Position), With<Food>>,
+    head_query: Query<&Position, With<SnakeHead>>,
+) {
+    let head_position = head_query.single();
+
+    for (food_entity, food_position) in food_positions.iter() {
+        if food_position == head_position {
+            commands.entity(food_entity).despawn();
+            growth_writer.send(GrowthEvent);
+        }
+    }
+}
+
 fn snake_movement_input(keyboard_input: Res<Input<KeyCode>>, mut heads: Query<&mut SnakeHead>) {
     if let Some(mut head) = heads.iter_mut().next() {
         let dir: Direction = if keyboard_input.pressed(KeyCode::Left) {
@@ -149,6 +171,7 @@ fn snake_movement(
     segments: ResMut<SnakeSegments>,
     mut head: Query<(Entity, &SnakeHead)>,
     mut positions: Query<&mut Position>,
+    mut last_tail_position: ResMut<LastTailPosition>,
 ) {
     let (head_entity, head) = head.single_mut();
 
@@ -196,6 +219,8 @@ fn snake_movement(
         .for_each(|(pos, segment)| {
             *positions.get_mut(*segment).unwrap() = *pos;
         });
+
+    *last_tail_position = LastTailPosition(*segment_positions.last().unwrap());
 }
 
 fn spawn_segment(mut commands: Commands, position: Position) -> Entity {
@@ -211,6 +236,17 @@ fn spawn_segment(mut commands: Commands, position: Position) -> Entity {
         .insert(position)
         .insert(Size::square(0.65))
         .id()
+}
+
+fn snake_growth(
+    commands: Commands,
+    last_tail_position: Res<LastTailPosition>,
+    mut segments: ResMut<SnakeSegments>,
+    mut growth_reader: EventReader<GrowthEvent>,
+) {
+    if growth_reader.iter().next().is_some() {
+        segments.push(spawn_segment(commands, last_tail_position.0));
+    }
 }
 
 fn setup_camera(mut commands: Commands) {
@@ -231,7 +267,9 @@ fn main() {
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(0.100))
-                .with_system(snake_movement),
+                .with_system(snake_movement)
+                .with_system(snake_eating.after(snake_movement))
+                .with_system(snake_growth.after(snake_eating)),
         )
         .add_system(snake_movement_input.before(snake_movement))
         .add_system_set(
@@ -246,6 +284,8 @@ fn main() {
                 .with_system(size_scaling),
         )
         .insert_resource(SnakeSegments::default())
+        .add_event::<GrowthEvent>()
+        .insert_resource(LastTailPosition::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
         .register_inspectable::<Size>()
