@@ -66,6 +66,7 @@ impl Direction {
 
 // Events
 struct GrowthEvent;
+struct GameOverEvent;
 
 fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Transform)>) {
     let window = windows.get_primary().unwrap();
@@ -172,6 +173,7 @@ fn snake_movement(
     mut head: Query<(Entity, &SnakeHead)>,
     mut positions: Query<&mut Position>,
     mut last_tail_position: ResMut<LastTailPosition>,
+    mut game_over_writer: EventWriter<GameOverEvent>,
 ) {
     let (head_entity, head) = head.single_mut();
 
@@ -213,6 +215,10 @@ fn snake_movement(
         }
     }
 
+    if segment_positions.contains(&head_position) {
+        game_over_writer.send(GameOverEvent);
+    }
+
     segment_positions
         .iter()
         .zip(segments.iter().skip(1))
@@ -249,6 +255,21 @@ fn snake_growth(
     }
 }
 
+fn game_over(
+    mut commands: Commands,
+    mut game_over_reader: EventReader<GameOverEvent>,
+    segments_res: ResMut<SnakeSegments>,
+    food: Query<Entity, With<Food>>,
+    segments: Query<Entity, With<SnakeSegment>>,
+) {
+    if game_over_reader.iter().next().is_some() {
+        for ent in food.iter().chain(segments.iter()) {
+            commands.entity(ent).despawn();
+        }
+        spawn_snake(commands, segments_res);
+    }
+}
+
 fn setup_camera(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 }
@@ -277,6 +298,7 @@ fn main() {
                 .with_run_criteria(FixedTimestep::step(1.0))
                 .with_system(food_spawner),
         )
+        .add_system(game_over.after(snake_movement))
         .add_system_set_to_stage(
             CoreStage::PostUpdate,
             SystemSet::new()
@@ -285,6 +307,7 @@ fn main() {
         )
         .insert_resource(SnakeSegments::default())
         .add_event::<GrowthEvent>()
+        .add_event::<GameOverEvent>()
         .insert_resource(LastTailPosition::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
