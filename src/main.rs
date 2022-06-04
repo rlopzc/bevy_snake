@@ -1,6 +1,6 @@
 use bevy::{core::FixedTimestep, prelude::*};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
-use rand::prelude::random;
+use rand::Rng;
 
 const ARENA_WIDTH: u32 = 10;
 const ARENA_HEIGHT: u32 = 10;
@@ -120,6 +120,8 @@ fn spawn_snake(mut commands: Commands, mut segments: ResMut<SnakeSegments>) {
 }
 
 fn food_spawner(mut commands: Commands) {
+    let mut rng = rand::thread_rng();
+
     commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
@@ -131,8 +133,8 @@ fn food_spawner(mut commands: Commands) {
         .insert(Food)
         .insert(Size::square(0.5))
         .insert(Position {
-            x: (random::<f32>() * ARENA_WIDTH as f32) as i32,
-            y: (random::<f32>() * ARENA_HEIGHT as f32) as i32,
+            x: rng.gen_range(0, ARENA_WIDTH as i32),
+            y: rng.gen_range(0, ARENA_WIDTH as i32),
         });
 }
 
