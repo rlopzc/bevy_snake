@@ -29,7 +29,7 @@ struct LastTailPosition(Position);
 #[derive(Component)]
 struct Food;
 
-#[derive(Default, Component, Clone, Copy, PartialEq, Eq, Inspectable)]
+#[derive(Debug, Default, Component, Clone, Copy, PartialEq, Eq, Inspectable)]
 struct Position {
     x: i32,
     y: i32,
@@ -119,8 +119,25 @@ fn spawn_snake(mut commands: Commands, mut segments: ResMut<SnakeSegments>) {
     ]);
 }
 
-fn food_spawner(mut commands: Commands) {
+fn food_spawner(
+    mut commands: Commands,
+    snake_segments: Res<SnakeSegments>,
+    positions: Query<&Position, With<SnakeSegment>>,
+) {
     let mut rng = rand::thread_rng();
+    let random_position = Position {
+        x: rng.gen_range(0, ARENA_WIDTH as i32),
+        y: rng.gen_range(0, ARENA_WIDTH as i32),
+    };
+
+    let snake_segment_positions = snake_segments
+        .iter()
+        .map(|e| *positions.get(*e).unwrap())
+        .collect::<Vec<Position>>();
+    if snake_segment_positions.contains(&random_position) {
+        println!("{:?} skipped!", &random_position);
+        return;
+    }
 
     commands
         .spawn_bundle(SpriteBundle {
@@ -132,10 +149,7 @@ fn food_spawner(mut commands: Commands) {
         })
         .insert(Food)
         .insert(Size::square(0.5))
-        .insert(Position {
-            x: rng.gen_range(0, ARENA_WIDTH as i32),
-            y: rng.gen_range(0, ARENA_WIDTH as i32),
-        });
+        .insert(random_position);
 }
 
 fn snake_eating(
@@ -175,7 +189,7 @@ fn snake_movement_input(keyboard_input: Res<Input<KeyCode>>, mut heads: Query<&m
 }
 
 fn snake_movement(
-    segments: ResMut<SnakeSegments>,
+    snake_segments: ResMut<SnakeSegments>,
     mut head: Query<(Entity, &SnakeHead)>,
     mut positions: Query<&mut Position>,
     mut last_tail_position: ResMut<LastTailPosition>,
@@ -187,7 +201,7 @@ fn snake_movement(
     }
 
     let (head_entity, head) = head.single_mut();
-    let segment_positions = segments
+    let snake_segment_positions = snake_segments
         .iter()
         .map(|e| *positions.get_mut(*e).unwrap())
         .collect::<Vec<Position>>();
@@ -225,18 +239,18 @@ fn snake_movement(
         }
     }
 
-    if segment_positions.contains(&head_position) {
+    if snake_segment_positions.contains(&head_position) {
         game_over_writer.send(GameOverEvent);
     }
 
-    segment_positions
+    snake_segment_positions
         .iter()
-        .zip(segments.iter().skip(1))
+        .zip(snake_segments.iter().skip(1))
         .for_each(|(pos, segment)| {
             *positions.get_mut(*segment).unwrap() = *pos;
         });
 
-    *last_tail_position = LastTailPosition(*segment_positions.last().unwrap());
+    *last_tail_position = LastTailPosition(*snake_segment_positions.last().unwrap());
 }
 
 fn spawn_segment(mut commands: Commands, position: Position) -> Entity {
