@@ -7,11 +7,15 @@ const ARENA_HEIGHT: u32 = 10;
 const SNAKE_HEAD_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
 const SNAKE_SEGMENT_COLOR: Color = Color::rgb(0.3, 0.3, 0.3);
 const FOOD_COLOR: Color = Color::rgb(1.0, 0.0, 1.0);
+const SNAKE_MOVEMENT_IN_MS: f32 = 0.100;
 
 #[derive(Component)]
 struct SnakeHead {
     direction: Direction,
 }
+
+#[derive(Component)]
+struct SnakeMovementTimer(Timer);
 
 #[derive(Component)]
 struct SnakeSegment;
@@ -174,9 +178,13 @@ fn snake_movement(
     mut positions: Query<&mut Position>,
     mut last_tail_position: ResMut<LastTailPosition>,
     mut game_over_writer: EventWriter<GameOverEvent>,
+    snake_movement_timer: Res<SnakeMovementTimer>,
 ) {
-    let (head_entity, head) = head.single_mut();
+    if !snake_movement_timer.0.finished() {
+        return;
+    }
 
+    let (head_entity, head) = head.single_mut();
     let segment_positions = segments
         .iter()
         .map(|e| *positions.get_mut(*e).unwrap())
@@ -255,6 +263,10 @@ fn snake_growth(
     }
 }
 
+fn snake_movement_timer(time: Res<Time>, mut snake_move_timer: ResMut<SnakeMovementTimer>) {
+    snake_move_timer.0.tick(time.delta());
+}
+
 fn game_over(
     mut commands: Commands,
     mut game_over_reader: EventReader<GameOverEvent>,
@@ -287,7 +299,7 @@ fn main() {
         .add_startup_system(spawn_snake)
         .add_system_set(
             SystemSet::new()
-                .with_run_criteria(FixedTimestep::step(0.100))
+                .with_run_criteria(FixedTimestep::step(SNAKE_MOVEMENT_IN_MS as f64))
                 .with_system(snake_movement)
                 .with_system(snake_eating.after(snake_movement))
                 .with_system(snake_growth.after(snake_eating)),
@@ -309,6 +321,11 @@ fn main() {
         .add_event::<GrowthEvent>()
         .add_event::<GameOverEvent>()
         .insert_resource(LastTailPosition::default())
+        .insert_resource(SnakeMovementTimer(Timer::from_seconds(
+            SNAKE_MOVEMENT_IN_MS,
+            true,
+        )))
+        .add_system(snake_movement_timer)
         .add_plugins(DefaultPlugins)
         .add_plugin(WorldInspectorPlugin::new())
         .register_inspectable::<Size>()
