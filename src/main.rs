@@ -135,7 +135,7 @@ fn food_spawner(
         .map(|e| *positions.get(*e).unwrap())
         .collect::<Vec<Position>>();
     if snake_segment_positions.contains(&random_position) {
-        println!("{:?} skipped!", &random_position);
+        println!("Food spawn {:?} skipped!", &random_position);
         return;
     }
 
